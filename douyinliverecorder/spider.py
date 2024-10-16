@@ -4,7 +4,7 @@
 Author: Hmily
 GitHub: https://github.com/ihmily
 Date: 2023-07-15 23:15:00
-Update: 2024-10-02 04:36:12
+Update: 2024-10-16 23:28:12
 Copyright (c) 2023-2024 by Hmily, All Rights Reserved.
 Function: Get live stream data.
 """
@@ -708,10 +708,9 @@ def get_bilibili_stream_data(url: str, qn: str = '10000', platform: str = 'web',
 def get_xhs_stream_url(url: str, proxy_addr: Union[str, None] = None, cookies: Union[str, None] = None) -> \
         Dict[str, Any]:
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-        'Referer': 'https://www.redelight.cn/hina/livestream/569077534207413574/1707413727088?share_source=&share_source_id=null&source=share_out_of_app&host_id=58bafe4282ec39085a56ece9&xhsshare=WeixinSession&appuid=5f3f478a00000000010005b3&apptime=1707413727',
+        'User-Agent': 'ios/7.830 (ios 17.0; ; iPhone 15 (A2846/A3089/A3090/A3092))',
+        'xy-common-params': 'platform=iOS&sid=session.1722166379345546829388',
+        'referer': 'https://app.xhs.cn/',
     }
     if cookies:
         headers['Cookie'] = cookies
@@ -719,24 +718,50 @@ def get_xhs_stream_url(url: str, proxy_addr: Union[str, None] = None, cookies: U
     if 'xhslink.com' in url:
         url = get_req(url, proxy_addr=proxy_addr, headers=headers, redirect_url=True)
 
-    room_id = re.search('/livestream/(.*?)(?=/|\?|$)', url).group(1)
-    app_api = f'https://www.xiaohongshu.com/api/sns/red/live/app/v1/ecology/outside/share_info?room_id={room_id}'
-    # app_api = f'https://www.redelight.cn/api/sns/red/live/app/v1/ecology/outside/share_info?room_id={room_id}'
-    json_str = get_req(url=app_api, proxy_addr=proxy_addr, headers=headers)
-    json_data = json.loads(json_str)
-    anchor_name = json_data['data']['host_info']['nickname']
-    live_status = json_data['data']['room']['status']
     result = {
-        "anchor_name": anchor_name,
+        "anchor_name": '',
         "is_live": False,
     }
+    room_id = re.search('/livestream/(.*?)(?=/|\?|$)', url)
+    if room_id:
+        room_id = room_id.group(1)
+        api = f'https://www.xiaohongshu.com/api/sns/red/live/app/v1/ecology/outside/share_info?room_id={room_id}'
+        # api = f'https://www.redelight.cn/api/sns/red/live/app/v1/ecology/outside/share_info?room_id={room_id}'
+        json_str = get_req(api, proxy_addr=proxy_addr, headers=headers)
+        json_data = json.loads(json_str)
+        anchor_name = json_data['data']['host_info']['nickname']
+        live_status = json_data['data']['room']['status']
+        result["anchor_name"] = anchor_name
 
-    # 这个判断不准确，无论是否在直播status都为0,暂无法判断
-    if live_status == 0:
-        flv_url = f'http://live-play.xhscdn.com/live/{room_id}.flv'
-        result['flv_url'] = flv_url
-        result['is_live'] = True
-        result['record_url'] = flv_url
+        # 这个判断不准确，无论是否在直播status都为0
+        if live_status == 0:
+            result['is_live'] = True
+            flv_url = f'http://live-play.xhscdn.com/live/{room_id}.flv'
+            result['flv_url'] = flv_url
+            result['record_url'] = flv_url
+
+    user_id = re.search('/user/profile/(.*?)(?=/|\?|$)', url)
+    user_id = user_id.group(1) if user_id else get_params(url, 'host_id')
+    if user_id:
+        params = {
+            'user_id_list': user_id,
+        }
+        # app方案
+        app_api = f'https://live-room.xiaohongshu.com/api/sns/v1/live/user_status?{urllib.parse.urlencode(params)}'
+        json_str = get_req(app_api, proxy_addr=proxy_addr, headers=headers)
+        json_data = json.loads(json_str)
+        if json_data["success"]:
+            if json_data['data']:
+                result['is_live'] = True
+                live_link = json_data['data'][0]['live_link']
+                result['anchor_name'] = get_params(live_link, "host_nickname")
+                flv_url = get_params(live_link, "flvUrl")
+                result['flv_url'] = flv_url
+                result['record_url'] = flv_url
+            else:
+                result['is_live'] = False
+        else:
+            print(f"小红书 {json_data['msg']}")
     return result
 
 
@@ -820,13 +845,13 @@ def get_blued_stream_url(url: str, proxy_addr: Union[str, None] = None, cookies:
 @trace_error_decorator
 def login_afreecatv(username: str, password: str, proxy_addr: Union[str, None] = None) -> Union[str, None]:
     if len(username) < 6 or len(password) < 10:
-        raise RuntimeError('AfreecaTV登录失败！请在config.ini配置文件中填写正确的AfreecaTV平台的账号和密码')
+        raise RuntimeError('SOOP[AfreecaTV]登录失败！请在config.ini配置文件中填写正确的SOOP[AfreecaTV]平台的账号和密码')
 
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
-        'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-        'Referer': 'https://login.afreecatv.com/afreeca/login.php?szFrom=full&request_uri=https%3A%2F%2Fwww.afreecatv.com%2F',
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Origin': 'https://play.sooplive.co.kr',
+        'Referer': 'https://play.sooplive.co.kr/superbsw123/277837074',
     }
 
     data = {
@@ -835,12 +860,12 @@ def login_afreecatv(username: str, password: str, proxy_addr: Union[str, None] =
         'szUid': username,
         'szPassword': password,
         'isSaveId': 'true',
-        'szScriptVar': 'oLoginRet',
-        'szAction': '',
+        'isSavePw': 'true',
+        'isSaveJoin': 'true',
         'isLoginRetain': 'Y',
     }
 
-    url = 'https://login.afreecatv.com/app/LoginAction.php?callback=jQuery17208926278503069585_1707311376418'
+    url = 'https://login.sooplive.co.kr/app/LoginAction.php'
     try:
         if proxy_addr:
             proxies = {
@@ -862,7 +887,7 @@ def login_afreecatv(username: str, password: str, proxy_addr: Union[str, None] =
         cookie = dict_to_cookie_str(cookie_dict)
         return cookie
     except Exception:
-        raise Exception('AfreecaTV登录失败,请检查配置文件中的账号密码是否正确')
+        raise Exception('SOOP[AfreecaTV]登录失败,请检查配置文件中的账号密码是否正确')
 
 
 @trace_error_decorator
@@ -871,7 +896,8 @@ def get_afreecatv_cdn_url(broad_no: str, proxy_addr: Union[str, None] = None, co
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0',
         'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-        'Referer': 'https://play.afreecatv.com/oul282/249469582',
+        'Origin': 'https://play.sooplive.co.kr',
+        'Referer': 'https://play.sooplive.co.kr/oul282/249469582',
         'Content-Type': 'application/x-www-form-urlencoded',
     }
     if cookies:
@@ -880,12 +906,12 @@ def get_afreecatv_cdn_url(broad_no: str, proxy_addr: Union[str, None] = None, co
     params = {
         'return_type': 'gcp_cdn',
         'use_cors': 'false',
-        'cors_origin_url': 'play.afreecatv.com',
+        'cors_origin_url': 'play.sooplive.co.kr',
         'broad_key': f'{broad_no}-common-master-hls',
         'time': '8361.086329376785',
     }
 
-    url2 = 'http://livestream-manager.afreecatv.com/broad_stream_assign.html?' + urllib.parse.urlencode(params)
+    url2 = 'http://livestream-manager.sooplive.co.kr/broad_stream_assign.html?' + urllib.parse.urlencode(params)
     json_str = get_req(url=url2, proxy_addr=proxy_addr, headers=headers, abroad=True)
     json_data = json.loads(json_str)
 
@@ -897,8 +923,8 @@ def get_afreecatv_tk(url: str, rtype: str, proxy_addr: Union[str, None] = None, 
         Union[str, tuple, None]:
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
-        'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-        'Referer': 'https://play.afreecatv.com/secretx/250989857',
+        'Origin': 'https://play.sooplive.co.kr',
+        'Referer': 'https://play.sooplive.co.kr/secretx/250989857',
         'Content-Type': 'application/x-www-form-urlencoded',
     }
 
@@ -920,9 +946,10 @@ def get_afreecatv_tk(url: str, rtype: str, proxy_addr: Union[str, None] = None, 
         'quality': 'master',
         'mode': 'landing',
         'from_api': '0',
+        'is_revive': 'false',
     }
 
-    url2 = f'https://live.afreecatv.com/afreeca/player_live_api.php?bjid={bj_id}'
+    url2 = f'https://live.sooplive.co.kr/afreeca/player_live_api.php?bjid={bj_id}'
     json_str = get_req(url=url2, proxy_addr=proxy_addr, headers=headers, data=data, abroad=True)
     json_data = json.loads(json_str)
 
@@ -943,7 +970,7 @@ def get_afreecatv_stream_data(
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0',
         'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-        'Referer': 'https://m.afreecatv.com/',
+        'Referer': 'https://m.sooplive.co.kr/',
         'Content-Type': 'application/x-www-form-urlencoded',
     }
     if cookies:
@@ -961,7 +988,7 @@ def get_afreecatv_stream_data(
         'mode': 'live',
     }
 
-    url2 = 'http://api.m.afreecatv.com/broad/a/watch'
+    url2 = 'http://api.m.sooplive.co.kr/broad/a/watch'
 
     json_str = get_req(url=url2, proxy_addr=proxy_addr, headers=headers, data=data, abroad=True)
     json_data = json.loads(json_str)
@@ -994,7 +1021,7 @@ def get_afreecatv_stream_data(
         def handle_login():
             cookie = login_afreecatv(username, password, proxy_addr=proxy_addr)
             if 'PdboxBbs=' in cookie:
-                print('AfreecaTV平台登录成功！开始获取直播数据...')
+                print('SOOP[AfreecaTV]平台登录成功！开始获取直播数据...')
                 return cookie
 
         def fetch_data(cookie):
@@ -1010,25 +1037,25 @@ def get_afreecatv_stream_data(
             return result
 
         if json_data['data']['code'] == -3001:
-            print("AfreecaTV直播获取失败[直播刚结束]:", json_data['data']['message'])
+            print("SOOP[AfreecaTV]直播获取失败[直播刚结束]:", json_data['data']['message'])
             return result
 
         elif json_data['data']['code'] == -3002:
-            print("AfreecaTV直播获取失败[未登录]: 19+", json_data['data']['message'])
-            print("正在尝试使用您的账号和密码登录AfreecaTV直播平台，请确保已配置")
+            print("SOOP[AfreecaTV]直播获取失败[未登录]: 19+", json_data['data']['message'])
+            print("正在尝试使用您的账号和密码登录SOOP[AfreecaTV]直播平台，请确保已配置")
             new_cookie = handle_login()
             if new_cookie and len(new_cookie) > 0:
                 return fetch_data(new_cookie)
-            raise RuntimeError('AfreecaTV登录失败，请检查账号和密码是否正确')
+            raise RuntimeError('SOOP[AfreecaTV]登录失败，请检查账号和密码是否正确')
 
         elif json_data['data']['code'] == -3004:
             # print("AfreecaTV直播获取失败[未认证]:", json_data['data']['message'])
             if cookies and len(cookies) > 0:
                 return fetch_data(cookies)
             else:
-                raise RuntimeError('AfreecaTV登录失败，请检查账号和密码是否正确')
+                raise RuntimeError('SOOP[AfreecaTV]登录失败，请检查账号和密码是否正确')
         elif json_data['data']['code'] == -6001:
-            print(f"错误信息：{json_data['data']['message']}请检查输入的直播间地址是否正确")
+            print(f"错误信息：{json_data['data']['message']}请检查输入的SOOP[AfreecaTV]直播间地址是否正确")
             return result
     if json_data['result'] == 1 and anchor_name:
         broad_no = json_data['data']['broad_no']
@@ -2356,13 +2383,13 @@ def get_acfun_stream_data(url: str, proxy_addr: Union[str, None] = None, cookies
 
 
 @trace_error_decorator
-def get_shiguang_stream_url(url: str, proxy_addr: Union[str, None] = None, cookies: Union[str, None] = None) -> \
+def get_changliao_stream_url(url: str, proxy_addr: Union[str, None] = None, cookies: Union[str, None] = None) -> \
         Dict[str, Any]:
     headers = {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
         'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-        'Referer': 'https://wap.rengzu.com/122377?promoters=956629',
+        'Referer': 'https://wap.tlclw.com/phone/801044397?promoters=0',
     }
     if cookies:
         headers['Cookie'] = cookies
@@ -2370,9 +2397,9 @@ def get_shiguang_stream_url(url: str, proxy_addr: Union[str, None] = None, cooki
     room_id = url.split('?')[0].rsplit('/', maxsplit=1)[-1]
     params = {
         'roomidx': room_id,
-        'currentUrl': f'https://wap.rengzu.com/{room_id}',
+        'currentUrl': f'https://wap.tlclw.com/{room_id}',
     }
-    play_api = f'https://wap.rengzu.com/api/ui/room/v1.0.0/live.ashx?{urllib.parse.urlencode(params)}'
+    play_api = f'https://wap.tlclw.com/api/ui/room/v1.0.0/live.ashx?{urllib.parse.urlencode(params)}'
     json_str = get_req(play_api, proxy_addr=proxy_addr, headers=headers)
     json_data = json.loads(json_str)
     anchor_name = json_data['data']['roomInfo']['nickname']
@@ -2585,4 +2612,102 @@ def get_haixiu_stream_url(url: str, proxy_addr: Union[str, None] = None, cookies
         flv_url = stream_data['media_url_web']
         result['flv_url'] = flv_url
         result['record_url'] = flv_url
+    return result
+
+
+@trace_error_decorator
+def get_vvxqiu_stream_url(url: str, proxy_addr: Union[str, None] = None, cookies: Union[str, None] = None) -> \
+        Dict[str, Any]:
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+        'Access-Control-Request-Method': 'GET',
+        'Origin': 'https://h5webcdn-pro.vvxqiu.com',
+        'Referer': 'https://h5webcdn-pro.vvxqiu.com/',
+    }
+
+    if cookies:
+        headers['Cookie'] = cookies
+
+    room_id = get_params(url, "roomId")
+    api_1 = f'https://h5p.vvxqiu.com/activity-center/fanclub/activity/captain/banner?roomId={room_id}&product=vvstar'
+    json_str = get_req(api_1, proxy_addr=proxy_addr, headers=headers)
+    json_data = json.loads(json_str)
+    anchor_name = json_data['data']['anchorName']
+    result = {
+        "anchor_name": anchor_name,
+        "is_live": False,
+    }
+    if json_data['data']['anchorRank'] != 0:
+        result["is_live"] = True
+        m3u8_url = f'https://liveplay-pro.wasaixiu.com/live/1400442770_{room_id}_{room_id[2:]}_single.m3u8'
+        result['m3u8_url'] = m3u8_url
+        result['record_url'] = m3u8_url
+    return result
+
+
+@trace_error_decorator
+def get_17live_stream_url(url: str, proxy_addr: Union[str, None] = None, cookies: Union[str, None] = None) -> \
+        Dict[str, Any]:
+    headers = {
+        'origin': 'https://17.live',
+        'referer': 'https://17.live/',
+        'user-agent': 'ios/7.830 (ios 17.0; ; iPhone 15 (A2846/A3089/A3090/A3092))',
+    }
+
+    if cookies:
+        headers['Cookie'] = cookies
+
+    room_id = url.split('?')[0].rsplit('/', maxsplit=1)[-1]
+    api_1 = f'https://wap-api.17app.co/api/v1/user/room/{room_id}'
+    json_str = get_req(api_1, proxy_addr=proxy_addr, headers=headers)
+    json_data = json.loads(json_str)
+    anchor_name = json_data["displayName"]
+    result = {
+        "anchor_name": anchor_name,
+        "is_live": False,
+    }
+    json_data = {
+        'liveStreamID': room_id,
+    }
+    api_1 = f'https://wap-api.17app.co/api/v1/lives/{room_id}/viewers/alive'
+    json_str = get_req(api_1, json_data=json_data, proxy_addr=proxy_addr, headers=headers)
+    json_data = json.loads(json_str)
+    if json_data['status'] == 2:
+        result["is_live"] = True
+        flv_url = json_data['pullURLsInfo']['rtmpURLs'][0]['urlHighQuality']
+        result['flv_url'] = flv_url
+        result['record_url'] = flv_url
+    return result
+
+
+@trace_error_decorator
+def get_langlive_stream_url(url: str, proxy_addr: Union[str, None] = None, cookies: Union[str, None] = None) -> \
+        Dict[str, Any]:
+    headers = {
+        'origin': 'https://www.lang.live',
+        'referer': 'https://www.lang.live/',
+        'user-agent': 'ios/7.830 (ios 17.0; ; iPhone 15 (A2846/A3089/A3090/A3092))',
+    }
+
+    if cookies:
+        headers['Cookie'] = cookies
+
+    room_id = url.split('?')[0].rsplit('/', maxsplit=1)[-1]
+    api_1 = f'https://api.lang.live/langweb/v1/room/liveinfo?room_id={room_id}'
+    json_str = get_req(api_1, proxy_addr=proxy_addr, headers=headers, abroad=True)
+    json_data = json.loads(json_str)
+    live_info = json_data['data']['live_info']
+    anchor_name = live_info['nickname']
+    live_status = live_info['live_status']
+    result = {
+        "anchor_name": anchor_name,
+        "is_live": False,
+    }
+    if live_status == 1:
+        result["is_live"] = True
+        flv_url = json_data['data']['live_info']['liveurl']
+        m3u8_url = json_data['data']['live_info']['liveurl_hls']
+        result['flv_url'] = flv_url
+        result['flv_url'] = m3u8_url
+        result['record_url'] = m3u8_url
     return result

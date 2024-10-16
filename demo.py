@@ -48,6 +48,10 @@ LIVE_STREAM_CONFIG = {
         "url": "https://play.afreecatv.com/sw7love",
         "func": spider.get_afreecatv_stream_data,
     },
+    "soop": {
+        "url": "https://play.sooplive.co.kr/sw7love",
+        "func": spider.get_afreecatv_stream_data,
+    },
     "netease": {
         "url": "https://cc.163.com/583946984",
         "func": spider.get_netease_stream_data,
@@ -120,9 +124,9 @@ LIVE_STREAM_CONFIG = {
         "url": "https://live.acfun.cn/live/17912421",
         "func": spider.get_acfun_stream_data,
     },
-    "shiguang": {
-        "url": "https://www.rengzu.com/180778",
-        "func": spider.get_shiguang_stream_url,
+    "changliao": {
+        "url": "https://www.tlclw.com/801044397",
+        "func": spider.get_changliao_stream_url,
     },
     "yingke": {
         "url": "https://www.inke.cn/liveroom/index.html?uid=710032101&id=1720857535354099",
@@ -143,6 +147,19 @@ LIVE_STREAM_CONFIG = {
     "haixiu": {
         "url": "https://www.haixiutv.com/6095106",
         "func": spider.get_haixiu_stream_url,
+    },
+    "vvxqiu": {
+        "url": "https://h5webcdn-pro.vvxqiu.com//activity/videoShare/videoShare.html?h5Server=https://h5p.vvxqiu.com"
+               "&roomId=LP115924473&platformId=vvstar",
+        "func": spider.get_vvxqiu_stream_url,
+    },
+    "17live": {
+        "url": "https://17.live/en/live/6302408",
+        "func": spider.get_17live_stream_url,
+    },
+    "langlive": {
+        "url": "https://www.lang.live/en-US/room/3349463",
+        "func": spider.get_langlive_stream_url,
     }
 }
 
