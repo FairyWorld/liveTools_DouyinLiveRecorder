@@ -4,7 +4,7 @@
 Author: Hmily
 GitHub: https://github.com/ihmily
 Date: 2023-07-17 23:52:05
-Update: 2024-10-05 11:54:00
+Update: 2024-10-16 23:27:00
 Copyright (c) 2023-2024 by Hmily, All Rights Reserved.
 Function: Record live stream video.
 """
@@ -37,8 +37,8 @@ from msg_push import (
 
 version = "v3.0.9"
 platforms = ("\n国内站点：抖音|快手|虎牙|斗鱼|YY|B站|小红书|bigo|blued|网易CC|千度热播|猫耳FM|Look|TwitCasting|百度|微博|"
-             "酷狗|花椒|流星|Acfun|时光|映客|音播|知乎|嗨秀"
-             "\n海外站点：TikTok|AfreecaTV|PandaTV|WinkTV|FlexTV|PopkonTV|TwitchTV|LiveMe|ShowRoom|CHZZK")
+             "酷狗|花椒|流星|Acfun|时光|映客|音播|知乎|嗨秀|VV星球|17Live|漂漂"
+             "\n海外站点：TikTok|SOOP[AfreecaTV]|PandaTV|WinkTV|FlexTV|PopkonTV|TwitchTV|LiveMe|ShowRoom|CHZZK|浪Live")
 
 recording = set()
 error_count = 0
@@ -87,7 +87,8 @@ def display_info():
     while True:
         try:
             time.sleep(5)
-            os.system(clear_command)
+            if Path(sys.executable).name != 'pythonw.exe':
+                os.system(clear_command)
             print(f"\r共监测{monitoring}个直播中", end=" | ")
             print(f"同一时间访问网络的线程数: {max_request}", end=" | ")
             print(f"是否开启代理录制: {'是' if use_proxy else '否'}", end=" | ")
@@ -159,13 +160,22 @@ def delete_line(file_path: str, del_line: str):
                     f.write(txt_line)
 
 
+def get_startup_info(system_type):
+    if system_type == 'nt':
+        startup_info = subprocess.STARTUPINFO()
+        startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    else:
+        startup_info = None
+    return startup_info
+
+
 def converts_mp4(address: str, is_original_delete: bool = True):
     _output = subprocess.check_output([
         "ffmpeg", "-i", address,
         "-c:v", "copy",
         "-c:a", "copy",
         "-f", "mp4", address.rsplit('.', maxsplit=1)[0] + ".mp4",
-    ], stderr=subprocess.STDOUT)
+    ], stderr=subprocess.STDOUT, startupinfo=get_startup_info(os_type))
     if is_original_delete:
         time.sleep(1)
         if os.path.exists(address):
@@ -178,7 +188,7 @@ def converts_m4a(address: str, is_original_delete: bool = True):
         "-n", "-vn",
         "-c:a", "aac", "-bsf:a", "aac_adtstoasc", "-ab", "320k",
         address.rsplit('.', maxsplit=1)[0] + ".m4a",
-    ], stderr=subprocess.STDOUT)
+    ], stderr=subprocess.STDOUT, startupinfo=get_startup_info(os_type))
     if is_original_delete:
         time.sleep(1)
         if os.path.exists(address):
@@ -260,7 +270,9 @@ def push_message(record_name, content: str) -> None:
 
 
 def run_bash(command):
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=get_startup_info(os_type)
+    )
     stdout, stderr = process.communicate()
     stdout_decoded = stdout.decode('utf-8')
     stderr_decoded = stderr.decode('utf-8')
@@ -282,7 +294,7 @@ def check_subprocess(record_name: str, record_url: str, ffmpeg_command: list, sa
 
     save_path_name = ffmpeg_command[-1]
     process = subprocess.Popen(
-        ffmpeg_command, stderr=subprocess.STDOUT
+        ffmpeg_command, stderr=subprocess.STDOUT, startupinfo=get_startup_info(os_type)
     )
 
     subs_file_path = save_path_name.rsplit('.', maxsplit=1)[0]
@@ -447,13 +459,6 @@ def start_record(url_data: tuple, count_variable: int = -1):
                             record_url.find("https://www.xiaohongshu.com/") > -1 or \
                             record_url.find("http://xhslink.com/") > -1:
                         platform = '小红书直播'
-                        if retry > 1:
-                            delete_line(url_config_file, record_url)
-                            if record_url in running_list:
-                                running_list.remove(record_url)
-                                not_record_list.append(record_url)
-                                logger.info(f'{record_url} 小红书直播已结束，停止录制')
-                                return
                         with semaphore:
                             port_info = spider.get_xhs_stream_url(
                                 record_url, proxy_addr=proxy_address, cookies=xhs_cookie)
@@ -471,8 +476,8 @@ def start_record(url_data: tuple, count_variable: int = -1):
                             port_info = spider.get_blued_stream_url(
                                 record_url, proxy_addr=proxy_address, cookies=blued_cookie)
 
-                    elif record_url.find("afreecatv.com/") > -1:
-                        platform = 'AfreecaTV'
+                    elif record_url.find("afreecatv.com/") > -1 or record_url.find("sooplive.co.kr/") > -1:
+                        platform = 'SOOP[AfreecaTV]'
                         with semaphore:
                             if global_proxy or proxy_address:
                                 json_data = spider.get_afreecatv_stream_data(
@@ -485,7 +490,7 @@ def start_record(url_data: tuple, count_variable: int = -1):
                                     update_config(config_file, 'Cookie', 'afreecatv_cookie', json_data['new_cookies'])
                                 port_info = stream.get_stream_url(json_data, record_quality, spec=True)
                             else:
-                                logger.error("错误信息: 网络异常，请检查本网络是否能正常访问AfreecaTV平台")
+                                logger.error("错误信息: 网络异常，请检查本网络是否能正常访问SOOP[AfreecaTV]平台")
 
                     elif record_url.find("cc.163.com/") > -1:
                         platform = '网易CC直播'
@@ -658,11 +663,11 @@ def start_record(url_data: tuple, count_variable: int = -1):
                             port_info = stream.get_stream_url(
                                 json_data, record_quality, url_type='flv', extra_key='url')
 
-                    elif record_url.find("rengzu.com/") > -1:
-                        platform = '时光直播'
+                    elif record_url.find("tlclw.com/") > -1:
+                        platform = '畅聊直播'
                         with semaphore:
-                            port_info = spider.get_shiguang_stream_url(
-                                url=record_url, proxy_addr=proxy_address, cookies=shiguang_cookie)
+                            port_info = spider.get_changliao_stream_url(
+                                url=record_url, proxy_addr=proxy_address, cookies=changliao_cookie)
 
                     elif record_url.find("ybw1666.com/") > -1:
                         platform = '音播直播'
@@ -695,13 +700,35 @@ def start_record(url_data: tuple, count_variable: int = -1):
                             port_info = spider.get_haixiu_stream_url(
                                 url=record_url, proxy_addr=proxy_address, cookies=haixiu_cookie)
 
+                    elif record_url.find("h5webcdn-pro.vvxqiu.com/") > -1:
+                        platform = 'VV星球'
+                        with semaphore:
+                            port_info = spider.get_vvxqiu_stream_url(
+                                url=record_url, proxy_addr=proxy_address, cookies=vvxqiu_cookie)
+
+                    elif record_url.find("17.live/") > -1:
+                        platform = '17Live'
+                        with semaphore:
+                            port_info = spider.get_17live_stream_url(
+                                url=record_url, proxy_addr=proxy_address, cookies=yiqilive_cookie)
+
+                    elif record_url.find("www.lang.live/") > -1:
+                        platform = '浪Live'
+                        with semaphore:
+                            port_info = spider.get_langlive_stream_url(
+                                url=record_url, proxy_addr=proxy_address, cookies=langlive_cookie)
+
+                    elif record_url.find("m.pp.weimipopo.com/") > -1:
+                        platform = '漂漂直播'
+                        with semaphore:
+                            port_info = spider.get_pplive_stream_url(
+                                url=record_url, proxy_addr=proxy_address, cookies=pplive_cookie)
+
                     else:
                         logger.error(f'{record_url} {platform}直播地址')
                         return
 
                     if anchor_name:
-                        # 第一次从config中读取，带有'主播:'，去除'主播:'
-                        # 之后的线程循环，已经是处理后的结果，不需要去处理
                         if '主播:' in anchor_name:
                             anchor_split: list = anchor_name.split('主播:')
                             if len(anchor_split) > 1 and anchor_split[1].strip():
@@ -817,7 +844,7 @@ def start_record(url_data: tuple, count_variable: int = -1):
                                     "-loglevel", "error",
                                     "-hide_banner",
                                     "-user_agent", user_agent,
-                                    "-protocol_whitelist", "rtmp,crypto,file,http,https,tcp,tls,udp,rtp",
+                                    "-protocol_whitelist", "rtmp,crypto,file,http,https,tcp,tls,udp,rtp,httpproxy",
                                     "-thread_queue_size", "1024",
                                     "-analyzeduration", analyzeduration,
                                     "-probesize", probesize,
@@ -837,6 +864,8 @@ def start_record(url_data: tuple, count_variable: int = -1):
                                     'PopkonTV': 'origin:https://www.popkontv.com',
                                     'FlexTV': 'origin:https://www.flextv.co.kr',
                                     '千度热播': 'referer:https://qiandurebo.com',
+                                    '17Live': 'referer:https://17.live/en/live/6302408',
+                                    '浪Live': 'referer:https://www.lang.live',
                                 }
                                 headers = record_headers.get(platform, '')
                                 if headers:
@@ -1242,7 +1271,7 @@ def check_ffmpeg_existence():
             # print(f"已将ffmpeg路径添加到环境变量：{ffmpeg_path}")
             return True
         else:
-            logger.error("检测到ffmpeg不存在,请将ffmpeg.exe放到同目录,或者设置为环境变量,没有ffmpeg将无法录制")
+            logger.error("未检测到ffmpeg。请确保ffmpeg位于系统路径中，或将其路径添加到环境变量。缺少ffmpeg将导致无法进行录制。")
             sys.exit(0)
     finally:
         dev_null.close()
@@ -1355,7 +1384,7 @@ while True:
     bash_path = read_config_value(config, '录制设置', 'bash脚本路径', "") if is_run_bash else None
     enable_proxy_platform = read_config_value(
         config, '录制设置', '使用代理录制的平台（逗号分隔）',
-        'tiktok, afreecatv, pandalive, winktv, flextv, popkontv, twitch, liveme, showroom, chzzk')
+        'tiktok, afreecatv, soop, pandalive, winktv, flextv, popkontv, twitch, liveme, showroom, chzzk')
     enable_proxy_platform_list = enable_proxy_platform.replace('，', ',').split(',') if enable_proxy_platform else None
     extra_enable_proxy = read_config_value(config, '录制设置', '额外使用代理录制的平台（逗号分隔）', '')
     extra_enable_proxy_platform_list = extra_enable_proxy.replace('，', ',').split(',') if extra_enable_proxy else None
@@ -1417,12 +1446,16 @@ while True:
     liuxing_cookie = read_config_value(config, 'Cookie', 'liuxing_cookie', '')
     showroom_cookie = read_config_value(config, 'Cookie', 'showroom_cookie', '')
     acfun_cookie = read_config_value(config, 'Cookie', 'acfun_cookie', '')
-    shiguang_cookie = read_config_value(config, 'Cookie', 'shiguang_cookie', '')
+    changliao_cookie = read_config_value(config, 'Cookie', 'changliao_cookie', '')
     yinbo_cookie = read_config_value(config, 'Cookie', 'yinbo_cookie', '')
     yingke_cookie = read_config_value(config, 'Cookie', 'yingke_cookie', '')
     zhihu_cookie = read_config_value(config, 'Cookie', 'zhihu_cookie', '')
     chzzk_cookie = read_config_value(config, 'Cookie', 'chzzk_cookie', '')
     haixiu_cookie = read_config_value(config, 'Cookie', 'haixiu_cookie', '')
+    vvxqiu_cookie = read_config_value(config, 'Cookie', 'vvxqiu_cookie', '')
+    yiqilive_cookie = read_config_value(config, 'Cookie', '17live_cookie', '')
+    langlive_cookie = read_config_value(config, 'Cookie', 'langlive_cookie', '')
+    pplive_cookie = read_config_value(config, 'Cookie', 'pplive_cookie', '')
 
     video_save_type_list = ("FLV", "MKV", "TS", "MP4", "MP3音频", "M4A音频")
     if video_save_type and video_save_type.upper() in video_save_type_list:
@@ -1506,18 +1539,23 @@ while True:
                     'wap.7u66.com',
                     'live.acfun.cn',
                     'm.acfun.cn',
-                    'www.rengzu.com',
-                    'wap.rengzu.com',
+                    'www.tlclw.com',
+                    'wap.tlclw.com',
                     'live.ybw1666.com',
                     'wap.ybw1666.com',
                     'www.inke.cn',
                     'www.zhihu.com',
-                    'www.haixiutv.com'
+                    'www.haixiutv.com',
+                    "h5webcdn-pro.vvxqiu.com",
+                    "17.live",
+                    "m.pp.weimipopo.com"
                 ]
                 overseas_platform_host = [
                     'www.tiktok.com',
                     'play.afreecatv.com',
                     'm.afreecatv.com',
+                    'play.sooplive.co.kr',
+                    'm.sooplive.co.kr',
                     'www.pandalive.co.kr',
                     'www.winktv.co.kr',
                     'www.flextv.co.kr',
@@ -1527,6 +1565,7 @@ while True:
                     'www.showroom-live.com',
                     'chzzk.naver.com',
                     'm.chzzk.naver.com',
+                    'www.lang.live'
                 ]
 
                 platform_host.extend(overseas_platform_host)
@@ -1535,8 +1574,6 @@ while True:
                     "live.bilibili.com",
                     "www.huajiao.com",
                     "www.zhihu.com",
-                    "www.xiaohongshu.com",
-                    "www.redelight.cn",
                     "www.huya.com",
                     "chzzk.naver.com",
                     "www.liveme.com",
@@ -1554,8 +1591,8 @@ while True:
                         new_line = (quality, url, name)
                         url_tuples_list.append(new_line)
                 else:
-                    print(f"\r{origin_line} 本行包含未知链接.此条跳过")
                     if not origin_line.startswith('#'):
+                        print(f"\r{origin_line} 本行包含未知链接.此条跳过")
                         update_file(url_config_file, url, url, start_str='#')
 
         while len(need_update_line_list):

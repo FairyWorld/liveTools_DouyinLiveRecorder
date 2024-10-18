@@ -48,6 +48,10 @@ LIVE_STREAM_CONFIG = {
         "url": "https://play.afreecatv.com/sw7love",
         "func": spider.get_afreecatv_stream_data,
     },
+    "soop": {
+        "url": "https://play.sooplive.co.kr/sw7love",
+        "func": spider.get_afreecatv_stream_data,
+    },
     "netease": {
         "url": "https://cc.163.com/583946984",
         "func": spider.get_netease_stream_data,
@@ -120,9 +124,9 @@ LIVE_STREAM_CONFIG = {
         "url": "https://live.acfun.cn/live/17912421",
         "func": spider.get_acfun_stream_data,
     },
-    "shiguang": {
-        "url": "https://www.rengzu.com/180778",
-        "func": spider.get_shiguang_stream_url,
+    "changliao": {
+        "url": "https://www.tlclw.com/801044397",
+        "func": spider.get_changliao_stream_url,
     },
     "yingke": {
         "url": "https://www.inke.cn/liveroom/index.html?uid=710032101&id=1720857535354099",
@@ -143,15 +147,32 @@ LIVE_STREAM_CONFIG = {
     "haixiu": {
         "url": "https://www.haixiutv.com/6095106",
         "func": spider.get_haixiu_stream_url,
+    },
+    "vvxqiu": {
+        "url": "https://h5webcdn-pro.vvxqiu.com//activity/videoShare/videoShare.html?h5Server=https://h5p.vvxqiu.com"
+               "&roomId=LP115924473&platformId=vvstar",
+        "func": spider.get_vvxqiu_stream_url,
+    },
+    "17live": {
+        "url": "https://17.live/en/live/6302408",
+        "func": spider.get_17live_stream_url,
+    },
+    "langlive": {
+        "url": "https://www.lang.live/en-US/room/3349463",
+        "func": spider.get_langlive_stream_url,
+    },
+    "pplive": {
+        "url": "https://m.pp.weimipopo.com/live/preview.html?uid=91648673&anchorUid=91625862&app=plpl",
+        "func": spider.get_pplive_stream_url,
     }
 }
 
 
-def test_live_stream(platform_name: str) -> None:
+def test_live_stream(platform_name: str, proxy_addr=None) -> None:
     if platform_name in LIVE_STREAM_CONFIG:
         config = LIVE_STREAM_CONFIG[platform_name]
         try:
-            stream_data = config['func'](config['url'], proxy_addr='')
+            stream_data = config['func'](config['url'], proxy_addr=proxy_addr)
             logger.debug(f"Stream data for {platform_name}: {stream_data}")
         except Exception as e:
             logger.error(f"Error fetching stream data for {platform_name}: {e}")
